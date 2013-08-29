@@ -1,4 +1,3 @@
-require "mongo"
 require "openssl"
 require "rack/oauth2/server/errors"
 require "rack/oauth2/server/utils"
@@ -39,8 +38,8 @@ module Rack
         # A Mongo::DB object.
         def database
           @database ||= Server.options.database
-          raise "No database Configured. You must configure it using Server.options.database = Mongo::Connection.new()[db_name]" unless @database
-          raise "You set Server.database to #{Server.database.class}, should be a Mongo::DB object" unless Mongo::DB === @database
+          raise "No database Configured. You must configure it using Server.options.database = Moped::Session.new([ '127.0.0.1:27017' ]).use db_name" unless @database
+          raise raise "You set Server.database to #{Server.database.class}, should be a Moped::Session object" unless Moped::Session === @database
           @database
         end
       end

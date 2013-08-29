@@ -108,7 +108,7 @@ module Rack
           if ::Sinatra.const_defined?("VERSION") && Gem::Version.new(::Sinatra::VERSION) >= Gem::Version.new("1.3.0")
             send_file settings.public_folder + "/views/index.html"
           else
-            send_file settings.public + "/views/index.html"
+            send_file settings.public_folder + "/views/index.html"
           end
         end
 
@@ -118,7 +118,7 @@ module Rack
             if ::Sinatra.const_defined?("VERSION") && Gem::Version.new(::Sinatra::VERSION) >= Gem::Version.new("1.3.0")
               send_file settings.public_folder + "/#{path}/" + params[:name]
             else
-              send_file settings.public + "/#{path}/" + params[:name]
+              send_file settings.public_folder + "/#{path}/" + params[:name]
             end
           end
         end

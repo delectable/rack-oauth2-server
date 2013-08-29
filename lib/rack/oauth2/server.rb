@@ -1,5 +1,4 @@
 require "rack"
-require "rack/oauth2/models"
 require "rack/oauth2/server/errors"
 require "rack/oauth2/server/utils"
 require "rack/oauth2/server/helper"
@@ -68,7 +67,7 @@ module Rack
         def register(args)
           if args[:id] && args[:secret] && (client = get_client(args[:id]))
             fail "Client secret does not match" unless client.secret == args[:secret]
-            client.update args
+            client.update(args)
           else
             Client.create(args)
           end
@@ -267,9 +266,10 @@ module Rack
             # 5.2.  The WWW-Authenticate Response Header Field
             logger.info "RO2S: HTTP authorization failed #{error.code}" if logger
             return unauthorized(request, error)
-          rescue =>ex
+          rescue => ex
             logger.info "RO2S: HTTP authorization failed #{ex.message}" if logger
-            return unauthorized(request)
+            request.env['rack.exception'] = ex
+            return [ 500, {}, [ex.message || ""] ]
           end
 
           # We expect application to use 403 if request has insufficient scope,
@@ -482,7 +482,7 @@ module Rack
         end
         raise InvalidClientError if client.revoked
         return client
-      rescue BSON::InvalidObjectId
+      rescue Moped::Errors::InvalidObjectId
         raise InvalidClientError
       end
 
@@ -578,3 +578,5 @@ module Rack
 
   end
 end
+
+require "rack/oauth2/models"
