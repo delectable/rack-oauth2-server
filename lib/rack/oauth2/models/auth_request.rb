@@ -67,7 +67,7 @@ module Rack
           if response_type == "code" # Requested authorization code
             access_grant = AccessGrant.create(identity, client, scope, redirect_uri)
             self.grant_code = access_grant.code
-            self.class.collection.update.find( :_id=>id, :revoked=>nil ).update( :$set=>{ :grant_code=>access_grant.code, :authorized_at=>authorized_at } )
+            self.class.collection.find( :_id=>id, :revoked=>nil ).update( :$set=>{ :grant_code=>access_grant.code, :authorized_at=>authorized_at } )
           else # Requested access token
             access_token = AccessToken.get_token_for(identity, client, scope, expires_in)
             self.access_token = access_token.token

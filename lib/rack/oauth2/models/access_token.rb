@@ -41,7 +41,7 @@ module Rack
                       :expires_at=>expires_at, :revoked=>nil }
             token[:identity] = identity if identity
             collection.insert token
-            Client.collection.update({ :_id=>client.id }, { :$inc=>{ :tokens_granted=>1 } })
+            Client.collection.find( :_id=>client.id ).update( :$inc=>{ :tokens_granted=>1 } )
             Server.new_instance self, token
           end
 
@@ -127,8 +127,8 @@ module Rack
         # Revokes this access token.
         def revoke!
           self.revoked = Time.now.to_i
-          AccessToken.collection.update({ :_id=>token }, { :$set=>{ :revoked=>revoked } })
-          Client.collection.update({ :_id=>client_id }, { :$inc=>{ :tokens_revoked=>1 } })
+          AccessToken.collection.find(:_id=>token).update( :$set=>{ :revoked=>revoked } )
+          Client.collection.find(:_id=>client_id).update( :$inc=>{ :tokens_revoked=>1 } )
         end
 
         Server.create_indexes do
