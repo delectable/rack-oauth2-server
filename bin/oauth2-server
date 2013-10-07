@@ -2,16 +2,17 @@
 $LOAD_PATH.unshift File.expand_path(File.dirname(__FILE__) + '/../lib')
 require "rack/oauth2/server"
 require "uri"
+require "moped"
 include Rack::OAuth2
 
 
 if (i = ARGV.index("--db")) && ARGV[i+1]
   url = ARGV[i + 1]
   uri = URI.parse(url)
-  uri = URI.parse("mongo://#{url}") if uri.opaque
-  db = Mongo::Connection.new(uri.host, uri.port)[uri.path.sub(/^\//, "")]
-  db.authenticate uri.user, uri.password if uri.user
-  Server.options.database = db
+  session = Moped::Session.new(["#{uri.host}:#{uri.port}"])
+  session.login(uri.user, uri.password) if uri.user
+  session.use(uri.path.sub(/^\//, ""))
+  Server.options.database = session 
   ARGV[i,2] = []
 end
 
@@ -47,13 +48,13 @@ when "register"
   fail "No database. Use the --db option to tell us which database to use" unless Server.options.database
   begin
     print "Application name:\t"
-    display_name = $stdin.gets
+    display_name = $stdin.gets.chomp
     print "Application URL:\t"
-    link = $stdin.gets
+    link = $stdin.gets.chomp
     print "Redirect URI:\t\t"
-    redirect_uri = $stdin.gets
+    redirect_uri = $stdin.gets.chomp
     print "Scope (space separated names):\t\t"
-    scope = $stdin.gets
+    scope = $stdin.gets.chomp
     client = Server.register(:display_name=>display_name, :link=>link, :redirect_uri=>redirect_uri, :scope=>scope)
   rescue
     puts "\nFailed to register client: #{$!}"
@@ -67,11 +68,11 @@ when "register_issuer"
   fail "No database. Use the --db option to tell us which database to use" unless Server.options.database
   begin
     print "Identifier (typically a URL):\t"
-    identifier = $stdin.gets
+    identifier = $stdin.gets.chomp
     print "HMAC secret:\t"
-    hmac_secret = $stdin.gets
+    hmac_secret = $stdin.gets.chomp
     print "RSA public key:\t\t"
-    public_key = $stdin.gets
+    public_key = $stdin.gets.chomp
     issuer = Server.register_issuer(:identifier => identifier, :hmac_secret => hmac_secret, :public_key => public_key)
   rescue
     puts "\nFailed to register issuer: #{$!}"
@@ -87,7 +88,7 @@ when "setup"
   puts "Where would you mount the Web console? This is a URL that must end with /admin,"
   puts "for example, http://example.com/oauth/admin"
   print ": "
-  uri = URI.parse($stdin.gets)
+  uri = URI.parse($stdin.gets.chomp)
   begin
     uri.normalize!
     fail "No an HTTP/S URL" unless uri.absolute? && %{http https}.include?(uri.scheme)
