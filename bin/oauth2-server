@@ -10,8 +10,8 @@ if (i = ARGV.index("--db")) && ARGV[i+1]
   url = ARGV[i + 1]
   uri = URI.parse(url)
   session = Moped::Session.new(["#{uri.host}:#{uri.port}"])
-  session.login(uri.user, uri.password) if uri.user
   session.use(uri.path.sub(/^\//, ""))
+  session.login(uri.user, uri.password) if uri.user
   Server.options.database = session 
   ARGV[i,2] = []
 end
