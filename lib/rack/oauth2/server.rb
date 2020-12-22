@@ -166,7 +166,7 @@ module Rack
       #   these names.
       # - :authorize_path --  Path for requesting end-user authorization. By
       #   convention defaults to /oauth/authorize.
-      # - :database -- Mongo::DB instance (this is a global option).
+      # - :database -- Mongo::Client's database instance, e.g. client.use('dbname').database (this is a global option).
       # - :expires_in -- Number of seconds an auth token will live. If nil or
       #   zero, access token never expires.
       # - :host -- Only check requests sent to this host.
@@ -482,7 +482,7 @@ module Rack
         end
         raise InvalidClientError if client.revoked
         return client
-      rescue Moped::Errors::InvalidObjectId
+      rescue BSON::ObjectId::Invalid
         raise InvalidClientError
       end
 

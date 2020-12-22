@@ -8,9 +8,9 @@ module Rack
           # Authenticate a client request. This method takes three arguments,
           # Find Client from client identifier.
           def find(client_id)
-            id = Moped::BSON::ObjectId(client_id.to_s)
-            Server.new_instance self, collection.find(:_id => id).one
-          rescue Moped::Errors::InvalidObjectId
+            id = BSON::ObjectId(client_id.to_s)
+            Server.new_instance self, collection.find({ :_id => id} ).limit(1).first
+          rescue BSON::ObjectId::Invalid
           end
 
           # Create a new client. Client provides the following properties:
@@ -33,24 +33,22 @@ module Rack
                         :notes=>args[:notes].to_s, :scope=>scope,
                         :created_at=>Time.now.to_i, :revoked=>nil }
             if args[:id] && args[:secret]
-              fields[:_id], fields[:secret] = Moped::BSON::ObjectId(args[:id].to_s), args[:secret]
-              collection.database.session.with(safe: true) do
-                collection.insert(fields)
-              end
+              fields[:_id], fields[:secret] = BSON::ObjectId(args[:id].to_s), args[:secret]
+              collection.insert_one(fields)
             else
               fields[:secret] = Server.secure_random
-              fields[:_id] = Moped::BSON::ObjectId.new
-              collection.insert(fields)
+              fields[:_id] = BSON::ObjectId.new
+              collection.insert_one(fields)
             end
             Server.new_instance self, fields
           end
 
           # Lookup client by ID, display name or URL.
           def lookup(field)
-            id = Moped::BSON::ObjectId(field.to_s)
-            Server.new_instance self, collection.find(:_id => id).one
-          rescue Moped::Errors::InvalidObjectId
-            Server.new_instance self, collection.find(:display_name=>field).one || collection.find(:link=>field).one
+            id = BSON::ObjectId(field.to_s)
+            Server.new_instance self, collection.find({ :_id => id }).limit(1).first
+          rescue BSON::ObjectId::Invalid
+            Server.new_instance self, collection.find({ :display_name=>field }).limit(1).one || collection.find({ :link=>field }).limit(1).first
           end
 
           # Returns all the clients in the database, sorted alphabetically.
@@ -61,11 +59,11 @@ module Rack
 
           # Deletes client with given identifier (also, all related records).
           def delete(client_id)
-            id = Moped::BSON::ObjectId(client_id.to_s)
-            Client.collection.remove({ :_id=>id })
-            AuthRequest.collection.remove({ :client_id=>id })
-            AccessGrant.collection.remove({ :client_id=>id })
-            AccessToken.collection.remove({ :client_id=>id })
+            id = BSON::ObjectId(client_id.to_s)
+            Client.collection.delete_one({ :_id=>id })
+            AuthRequest.collection.delete_one({ :client_id=>id })
+            AccessGrant.collection.delete_one({ :client_id=>id })
+            AccessToken.collection.delete_one({ :client_id=>id })
           end
 
           def collection
@@ -115,7 +113,7 @@ module Rack
           fields = [:display_name, :link, :image_url, :notes].inject({}) { |h,k| v = args[k]; h[k] = v if v; h }
           fields[:redirect_uri] = Server::Utils.parse_redirect_uri(args[:redirect_uri]).to_s if args[:redirect_uri]
           fields[:scope] = Server::Utils.normalize_scope(args[:scope])
-          self.class.collection.find(:_id => id).update( :$set=>fields )
+          self.class.collection.update_one({ :_id => id }, { :$set=>fields })
 
           fields.each do |name, value|
             self.instance_variable_set :"@#{name}", value
@@ -126,8 +124,8 @@ module Rack
         Server.create_indexes do
           # For quickly returning clients sorted by display name, or finding
           # client from a URL.
-          collection.indexes.create :display_name => 1
-          collection.indexes.create :link => 1
+          collection.indexes.create_many(display_name: 1)
+          collection.indexes.create_one(link: 1)
         end
       end
 

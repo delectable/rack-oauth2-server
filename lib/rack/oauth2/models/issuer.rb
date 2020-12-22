@@ -8,7 +8,7 @@ module Rack
 
           # returns the Issuer object for the given identifier
           def from_identifier(identifier)
-            Server.new_instance self, collection.find(:_id=>identifier).one
+            Server.new_instance self, collection.find({ :_id=>identifier }).limit(1).first
           end
 
           # Create a new Issuer.
@@ -20,7 +20,7 @@ module Rack
             fields[:created_at] = Time.now.to_i
             fields[:updated_at] = Time.now.to_i
             fields[:_id] = args[:identifier]
-            collection.insert(fields, :safe=>true)
+            collection.insert_one(fields)
             Server.new_instance self, fields
           end
 
@@ -44,13 +44,13 @@ module Rack
 
         def update(args)
           fields = [:hmac_secret, :public_key, :notes].inject({}) {|h,k| v = args[k]; h[k] = v if v; h}
-          self.class.collection.find(:_id => identifier ).update({:$set => fields})
+          self.class.collection.update_one({ :_id => identifier }, {:$set => fields})
           self.class.from_identifier(identifier)
         end
 
         Server.create_indexes do
           # Used to revoke all pending access grants when revoking client.
-          collection.create_index [[:identifier, Mongo::ASCENDING]]
+          collection.indexes.create_one(identifier: 1)
         end
       end
     end

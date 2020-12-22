@@ -8,7 +8,7 @@ module Rack
         class << self
           # Find AccessGrant from authentication code.
           def from_code(code)
-            Server.new_instance self, collection.find(:_id=>code, :revoked=>nil).one
+            Server.new_instance self, collection.find({:_id=>code, :revoked=>nil}).limit(1).first
           end
 
           # Create a new access grant.
@@ -20,7 +20,7 @@ module Rack
                        :client_id=>client.id, :redirect_uri=>client.redirect_uri || redirect_uri,
                        :created_at=>Time.now.to_i, :expires_at=>expires_at, :granted_at=>nil,
                        :access_token=>nil, :revoked=>nil }
-            collection.insert fields
+            collection.insert_one fields
             Server.new_instance self, fields
           end
 
@@ -64,17 +64,15 @@ module Rack
           access_token = AccessToken.get_token_for(identity, client, scope, expires_in)
           self.access_token = access_token.token
           self.granted_at = Time.now.to_i
-          self.class.collection.database.session.with(safe: true) do
-            self.class.collection.find(:_id=>code, :access_token=>nil, :revoked=>nil).update( :$set=>{ :granted_at=>granted_at, :access_token=>access_token.token } )
-          end
-          reload = self.class.collection.find(:_id=>code, :revoked=>nil).select(:access_token => 1).one
+          self.class.collection.update_one({:_id=>code, :access_token=>nil, :revoked=>nil}, {:$set=>{ :granted_at=>granted_at, :access_token=>access_token.token }} )
+          reload = self.class.collection.find({:_id=>code, :revoked=>nil}, { 'projection' => { 'access_token' => 1 } }).limit(1).first
           raise InvalidGrantError unless reload && reload["access_token"] == access_token.token
           return access_token
         end
 
         def revoke!
           self.revoked = Time.now.to_i
-          self.class.collection.find(:_id=>code, :revoked=>nil).update(:$set=>{ :revoked=>revoked })
+          self.class.collection.update_one({:_id=>code, :revoked=>nil}, {:$set=>{ :revoked=>revoked }})
         end
 
         Server.create_indexes do

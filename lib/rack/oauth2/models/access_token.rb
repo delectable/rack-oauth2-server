@@ -11,7 +11,7 @@ module Rack
 
           # Find AccessToken from token. Does not return revoked tokens.
           def from_token(token)
-            Server.new_instance self, collection.find(:_id=>token, :revoked=>nil).one
+            Server.new_instance self, collection.find({ :_id=>token, :revoked=>nil }).limit(1).first
           end
 
           # Get an access token (create new one if necessary).
@@ -41,20 +41,20 @@ module Rack
                       :expires_at=>expires_at, :revoked=>nil }
             token[:identity] = identity if identity
             collection.insert token
-            Client.collection.find( :_id=>client.id ).update( :$inc=>{ :tokens_granted=>1 } )
+            Client.collection.update_one({ :_id=>client.id }, { :$inc=>{ :tokens_granted=>1 }})
             Server.new_instance self, token
           end
 
           # Find all AccessTokens for an identity.
           def from_identity(identity)
-            collection.find( :identity=>identity ).map { |fields| Server.new_instance self, fields }
+            collection.find({ :identity=>identity }).map { |fields| Server.new_instance self, fields }
           end
 
           # Returns all access tokens for a given client, Use limit and offset
           # to return a subset of tokens, sorted by creation date.
           def for_client(client_id, offset = 0, limit = 100)
-            client_id = Moped::BSON::ObjectId(client_id.to_s)
-            collection.find(:client_id=>client_id).sort(:created_at => 1).skip(offset).limit(limit).
+            client_id = BSON::ObjectId(client_id.to_s)
+            collection.find({ :client_id=>client_id }).sort(created_at: 1).skip(offset).limit(limit).
               map { |token| Server.new_instance self, token }
           end
 
@@ -73,7 +73,7 @@ module Rack
             elsif filter.has_key?(:revoked)
               select[:revoked] = filter[:revoked] ? { :$ne=>nil } : { :$eq=>nil }
             end
-            select[:client_id] = Moped::BSON::ObjectId(filter[:client_id].to_s) if filter[:client_id]
+            select[:client_id] = BSON::ObjectId(filter[:client_id].to_s) if filter[:client_id]
             collection.find(select).count
           end
 
@@ -82,11 +82,12 @@ module Rack
             select = { :$gt=> { :created_at=>Time.now - 86400 * days } }
             select = {}
             if filter[:client_id]
-              select[:client_id] = Moped::BSON::ObjectId(filter[:client_id].to_s)
+              select[:client_id] = BSON::ObjectId(filter[:client_id].to_s)
             end
-            raw = Server::AccessToken.collection.group("function (token) { return { ts: Math.floor(token.created_at / 86400) } }",
-              select, { :granted=>0 }, "function (token, state) { state.granted++ }")
-            raw.sort { |a, b| a["ts"] - b["ts"] }
+            # TODO: 2021: If needed, replace the following with an aggregation
+            # raw = Server::AccessToken.collection.group("function (token) { return { ts: Math.floor(token.created_at / 86400) } }",
+            #   select, { :granted=>0 }, "function (token, state) { state.granted++ }")
+            # raw.sort { |a, b| a["ts"] - b["ts"] }
           end
 
           def collection
@@ -119,7 +120,7 @@ module Rack
         def access!
           today = (Time.now.to_i / 3600) * 3600
           if last_access.nil? || last_access < today
-            AccessToken.collection.find( :_id=>token ).update( :$set=>{ :last_access=>today, :prev_access=>last_access } )
+            AccessToken.collection.update_one({ :_id=>token }, { :$set=>{ :last_access=>today, :prev_access=>last_access }})
             self.last_access = today
           end
         end
@@ -127,8 +128,8 @@ module Rack
         # Revokes this access token.
         def revoke!
           self.revoked = Time.now.to_i
-          AccessToken.collection.find(:_id=>token).update( :$set=>{ :revoked=>revoked } )
-          Client.collection.find(:_id=>client_id).update( :$inc=>{ :tokens_revoked=>1 } )
+          AccessToken.collection.update_one({ :_id=>token }, { :$set=>{ :revoked=>revoked }})
+          Client.collection.update_one({ :_id=>client_id }, { :$inc=>{ :tokens_revoked=>1 }})
         end
 
         Server.create_indexes do

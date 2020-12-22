@@ -11,13 +11,12 @@ $: << File.dirname(__FILE__) + "/../lib"
 $: << File.expand_path(File.dirname(__FILE__) + "/..")
 require "rack/oauth2/server"
 require "rack/oauth2/server/admin"
-require 'moped'
+require 'mongo'
 
 
 ENV["RACK_ENV"] = "test"
 ENV["DB"] = "rack_oauth2_server_test"
-DATABASE = Moped::Session.new([ '127.0.0.1:27017' ])
-DATABASE.use(ENV["DB"])
+DATABASE = Mongo::Client.new([ '127.0.0.1:27017' ], database: ENV["DB"], write_concern: { w: 1 })
 FRAMEWORK = ENV["FRAMEWORK"] || "sinatra"
 
 
