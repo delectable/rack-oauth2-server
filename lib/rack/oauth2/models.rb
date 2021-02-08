@@ -39,7 +39,7 @@ module Rack
         def database
           @database ||= Server.options.database
           raise "No database Configured. You must configure it using Server.options.database = Mongo::Client.new([ '127.0.0.1:27017' ], database: db_name).database" unless @database
-          raise raise "You set Server.database to #{Server.database.class}, should be a Moped::Session object" unless Mongo::Database === @database
+          raise raise "You set Server.database to #{@database.class}, should be a Moped::Client object" unless Mongo::Client === @database
           @database
         end
       end
